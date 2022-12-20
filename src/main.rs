@@ -7,6 +7,9 @@ use python_parser::ast::*;
 #[allow(dead_code)]
 mod ast;
 
+#[allow(dead_code)]
+mod compiler;
+
 fn build() -> Result<(), rspirv::dr::Error> {
     let mut b = rspirv::dr::Builder::new();
 
@@ -47,4 +50,8 @@ fn main() {
     let mut a = ast::Ast::default();
     a.function(&ast, sig);
     println!("{:#?}", a);
+
+    let mut comp = compiler::Compiler::new();
+    comp.compile(&a);
+    println!("{}", comp.b.module().disassemble());
 }

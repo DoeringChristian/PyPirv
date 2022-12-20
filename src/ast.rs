@@ -132,7 +132,7 @@ pub enum Expression {
 }
 
 impl Expression {
-    fn ty(&self) -> Option<Type> {
+    pub fn ty(&self) -> Option<Type> {
         match self {
             Self::True => Some(Type::Bool),
             Self::False => Some(Type::Bool),
@@ -149,19 +149,20 @@ impl Expression {
 #[derive(Debug)]
 pub enum Statement {
     Return(Box<Expression>),
-    Assign(Box<Expression>, Box<Expression>),
+    Assign(String, Box<Expression>),
     If(Vec<(Expression, Vec<Statement>)>, Option<Vec<Statement>>),
 }
 
 #[derive(Debug, Default)]
 pub struct FunctionDef {
-    code: Vec<Statement>,
-    return_type: Type,
+    pub args: Vec<String>,
+    pub code: Vec<Statement>,
+    pub return_type: Type,
 }
 
 #[derive(Debug, Default)]
 pub struct Ast {
-    functions: HashMap<FunctionSig, FunctionDef>,
+    pub functions: HashMap<FunctionSig, FunctionDef>,
 }
 
 impl Ast {
@@ -186,7 +187,6 @@ impl Ast {
         src: &[py::Statement],
         expr: &py::Expression,
         types: &mut HashMap<String, Type>,
-        ty: Option<Type>,
     ) -> Expression {
         match expr {
             py::Expression::True => Expression::True,
@@ -196,27 +196,20 @@ impl Ast {
                 Expression::Int((*i.to_u32_digits().iter().last().unwrap()) as i32)
             }
             py::Expression::Uop(uop, expr) => {
-                let expr = self.expr(src, expr, types, ty);
+                let expr = self.expr(src, expr, types);
                 let ty = expr.ty();
                 Expression::Uop(Uop::from(uop), Box::new(expr), ty)
             }
             py::Expression::Bop(bop, lhs, rhs) => {
-                let lhs = self.expr(src, lhs, types, ty);
-                let rhs = self.expr(src, rhs, types, ty);
+                let lhs = self.expr(src, lhs, types);
+                let rhs = self.expr(src, rhs, types);
                 let bop = Bop::from(bop);
                 let ty = bop.ty(&lhs.ty().unwrap(), &rhs.ty().unwrap());
                 Expression::Bop(bop, Box::new(lhs), Box::new(rhs), Some(ty))
             }
             py::Expression::Name(name) => {
-                if let Some(ty) = ty {
-                    assert!(!types.contains_key(name));
-                    types.insert(name.clone(), ty);
-                    Expression::Name(name.clone(), Some(ty))
-                } else {
-                    assert!(types.contains_key(name));
-                    let ty = types.get(name).copied();
-                    Expression::Name(name.clone(), ty)
-                }
+                let ty = types[name];
+                Expression::Name(name.clone(), Some(ty))
             }
             py::Expression::Call(expr, args) => {
                 if let py::Expression::Name(name) = expr.as_ref() {
@@ -224,7 +217,7 @@ impl Ast {
                         .iter()
                         .map(|arg| {
                             if let py::Argument::Positional(expr) = arg {
-                                self.expr(src, expr, types, ty)
+                                self.expr(src, expr, types)
                             } else {
                                 unimplemented!()
                             }
@@ -256,7 +249,7 @@ impl Ast {
         match stmt {
             py::Statement::Return(expr) => {
                 assert!(expr.len() == 1);
-                let expr = self.expr(src, &expr[0], types, None);
+                let expr = self.expr(src, &expr[0], types);
 
                 let ty = expr.ty().unwrap();
                 if types.contains_key("return".into()) {
@@ -271,21 +264,19 @@ impl Ast {
                 assert!(lhs.len() == 1);
                 assert!(rhs.len() == 1);
                 assert!(rhs[0].len() == 1);
-                let rhs = self.expr(src, &rhs[0][0], types, None);
-                let lhs = self.expr(
-                    src,
-                    &lhs[0],
-                    types,
-                    Some(rhs.ty().expect("Type whas expected")),
-                );
-                Statement::Assign(Box::new(lhs), Box::new(rhs))
+                if let py::Expression::Name(name) = &lhs[0] {
+                    let rhs = self.expr(src, &rhs[0][0], types);
+                    Statement::Assign(name.clone(), Box::new(rhs))
+                } else {
+                    unimplemented!()
+                }
             }
             py::Statement::Compound(stmt) => match stmt.as_ref() {
                 py::CompoundStatement::If(i, e) => {
                     let i = i
                         .iter()
                         .map(|(expr, code)| {
-                            let expr = self.expr(src, expr, types, None);
+                            let expr = self.expr(src, expr, types);
                             let code = code
                                 .iter()
                                 .map(|stmt| self.statement(src, stmt, types))
@@ -310,15 +301,16 @@ impl Ast {
             // return early if function signature is already defined
             return &self.functions[&sig];
         }
-        let fdef = Self::find_funcdef(src, &sig.name);
+        let mut fdef = Self::find_funcdef(src, &sig.name);
 
         // Add function arg types
         let mut types: HashMap<String, Type> = HashMap::default();
+        let mut f = FunctionDef::default();
         for (i, arg) in fdef.parameters.args.iter().enumerate() {
+            f.args.push(arg.0.clone());
             types.insert(arg.0.clone(), sig.args[i].clone());
         }
 
-        let mut f = FunctionDef::default();
         for stmt in &fdef.code {
             f.code.push(self.statement(src, stmt, &mut types))
         }
