@@ -45,6 +45,6 @@ fn main() {
         args: vec![ast::Type::Float32, ast::Type::Float32],
     };
     let mut a = ast::Ast::default();
-    a.insert_function(&ast, sig);
+    a.function(&ast, sig);
     println!("{:#?}", a);
 }

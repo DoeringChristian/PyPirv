@@ -1,3 +1,6 @@
-def test(x, y):
-    z = x < y
+def add(x, y):
     return x + y
+
+
+def test(x, y):
+    return add(x, y)
