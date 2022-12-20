@@ -3,4 +3,4 @@ def add(x, y):
 
 
 def test(x, y):
-    return x + y
+    return add(x, y)

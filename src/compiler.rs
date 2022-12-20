@@ -111,6 +111,16 @@ impl Compiler {
             ast::Expression::Name(name, ty) => self.vars[name],
             ast::Expression::Uop(uop, expr, ty) => self.record_uop(*uop, expr, ty.unwrap()),
             ast::Expression::Bop(bop, lhs, rhs, ty) => self.record_bop(*bop, lhs, rhs, ty.unwrap()),
+            ast::Expression::Call(sig, args, ty) => {
+                let ty = self.record_type(ty.unwrap());
+                let args = args
+                    .iter()
+                    .map(|arg| self.record_expr(arg))
+                    .collect::<Vec<_>>();
+                self.b
+                    .function_call(ty, None, self.functions[sig], args)
+                    .unwrap()
+            }
             _ => unimplemented!(),
         }
     }
