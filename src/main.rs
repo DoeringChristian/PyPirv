@@ -32,6 +32,7 @@ fn build() -> Result<(), rspirv::dr::Error> {
 }
 
 fn main() {
+    let ty = rspirv::sr::Type::Void;
     //build().unwrap();
     let code = include_str!("input/test.py");
     let ast = python_parser::file_input(python_parser::make_strspan(code))

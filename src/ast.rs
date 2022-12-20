@@ -3,9 +3,15 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Type {
+    Void,
     Bool,
     Int32,
     Float32,
+}
+impl Default for Type {
+    fn default() -> Self {
+        Self::Void
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -147,6 +153,7 @@ enum Statement {
 #[derive(Debug, Default)]
 pub struct FunctionDef {
     code: Vec<Statement>,
+    return_type: Type,
 }
 
 #[derive(Debug, Default)]
@@ -215,6 +222,14 @@ impl Ast {
             py::Statement::Return(expr) => {
                 assert!(expr.len() == 1);
                 let expr = self.expr(&expr[0], types, None);
+
+                let ty = expr.ty().unwrap();
+                if types.contains_key("return".into()) {
+                    assert!(ty == types["return"])
+                } else {
+                    types.insert("return".into(), ty);
+                }
+
                 Statement::Return(Box::new(expr))
             }
             py::Statement::Assignment(lhs, rhs) => {
@@ -240,10 +255,16 @@ impl Ast {
         for (i, arg) in fdef.parameters.args.iter().enumerate() {
             types.insert(arg.0.clone(), sig.args[i].clone());
         }
+
         let mut f = FunctionDef::default();
         for stmt in &fdef.code {
             f.code.push(self.statement(stmt, &mut types))
         }
+
+        if types.contains_key("return".into()) {
+            f.return_type = types["return"];
+        }
+
         self.functions.insert(sig, f);
     }
 }
