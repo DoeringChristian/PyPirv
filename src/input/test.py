@@ -3,4 +3,7 @@ def add(x, y):
 
 
 def test(x, y):
-    return add(x, y)
+    if x < 0.0:
+        return add(x, y)
+    elif x > 0.0:
+        return x + y

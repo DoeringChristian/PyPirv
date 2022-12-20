@@ -147,9 +147,10 @@ impl Expression {
 }
 
 #[derive(Debug)]
-enum Statement {
+pub enum Statement {
     Return(Box<Expression>),
     Assign(Box<Expression>, Box<Expression>),
+    If(Vec<(Expression, Vec<Statement>)>, Option<Vec<Statement>>),
 }
 
 #[derive(Debug, Default)]
@@ -280,6 +281,25 @@ impl Ast {
                 Statement::Assign(Box::new(lhs), Box::new(rhs))
             }
             py::Statement::Compound(stmt) => match stmt.as_ref() {
+                py::CompoundStatement::If(i, e) => {
+                    let i = i
+                        .iter()
+                        .map(|(expr, code)| {
+                            let expr = self.expr(src, expr, types, None);
+                            let code = code
+                                .iter()
+                                .map(|stmt| self.statement(src, stmt, types))
+                                .collect::<Vec<_>>();
+                            (expr, code)
+                        })
+                        .collect::<Vec<_>>();
+                    let e = e.as_ref().map(|code| {
+                        code.iter()
+                            .map(|stmt| self.statement(src, stmt, types))
+                            .collect::<Vec<_>>()
+                    });
+                    Statement::If(i, e)
+                }
                 _ => unimplemented!(),
             },
             _ => unimplemented!(),
